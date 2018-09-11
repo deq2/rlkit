@@ -12,14 +12,16 @@ from rlkit.policies.base import ExplorationPolicy
 from rlkit.samplers.in_place import InPlacePathSampler
 
 
-class RLAlgorithm(metaclass=abc.ABCMeta):
+class MetaRLAlgorithm(metaclass=abc.ABCMeta):
     def __init__(
             self,
-            env,
+            envs,
             exploration_policy: ExplorationPolicy,
-            training_env=None,
+            eval_envs=None,
+            meta_batch=64,
             num_epochs=100,
             num_steps_per_epoch=10000,
+            num_eval_tasks=1,
             num_steps_per_eval=1000,
             num_updates_per_env_step=1,
             batch_size=1024,
@@ -30,21 +32,21 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
             render=False,
             save_replay_buffer=False,
             save_algorithm=False,
-            save_environment=True,
+            save_environment=False, # TODO was true
             eval_sampler=None,
             eval_policy=None,
-            replay_buffer=None,
+            replay_buffers=None,
     ):
         """
-        Base class for RL Algorithms
-        :param env: Environment used to evaluate.
-        :param exploration_policy: Policy used to explore
-        :param training_env: Environment used by the algorithm. By default, a
-        copy of `env` will be made.
-        :param num_epochs:
-        :param num_steps_per_epoch:
+        Base class for Meta RL Algorithms
+        :param envs: list of environments used for training, by default same envs used for eval
+        :param eval_envs: optional list of environments used for evaluation
+        :param exploration_policy: policy used to explore
+        :param meta_batch: number of tasks used for meta-update
+        :param num_epochs: number of meta-training epochs
+        :param num_steps_per_epoch: number of updates per epoch
+        :param num_eval_tasks: number of tasks to eval on
         :param num_steps_per_eval:
-        :param num_updates_per_env_step: Used by online training mode.
         :param num_updates_per_epoch: Used by batch training mode.
         :param batch_size:
         :param max_path_length:
@@ -56,13 +58,17 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         :param save_algorithm:
         :param save_environment:
         :param eval_sampler:
-        :param eval_policy: Policy to evaluate with.
-        :param replay_buffer:
+        :param eval_policy: policy to evaluate with, if None then defaults to exploration policy
+        :param replay_buffers: one for each task
         """
-        self.training_env = training_env or pickle.loads(pickle.dumps(env))
+        self.envs = envs
         self.exploration_policy = exploration_policy
+        if eval_envs is None:
+            self.eval_envs = envs
+        self.meta_batch = meta_batch
         self.num_epochs = num_epochs
         self.num_env_steps_per_epoch = num_steps_per_epoch
+        self.num_eval_tasks = num_eval_tasks
         self.num_steps_per_eval = num_steps_per_eval
         self.num_updates_per_train_call = num_updates_per_env_step
         self.batch_size = batch_size
@@ -76,9 +82,10 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         self.save_environment = save_environment
         if eval_sampler is None:
             if eval_policy is None:
+                # TODO why eval with exploration pi?
                 eval_policy = exploration_policy
             eval_sampler = InPlacePathSampler(
-                env=env,
+                env=envs[0], # TODO
                 policy=eval_policy,
                 max_samples=self.num_steps_per_eval + self.max_path_length,
                 max_path_length=self.max_path_length,
@@ -86,15 +93,14 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         self.eval_policy = eval_policy
         self.eval_sampler = eval_sampler
 
-        self.action_space = env.action_space
-        self.obs_space = env.observation_space
-        self.env = env
-        if replay_buffer is None:
-            replay_buffer = EnvReplayBuffer(
-                self.replay_buffer_size,
-                self.env,
-            )
-        self.replay_buffer = replay_buffer
+        if replay_buffers is None:
+            buffers = []
+            for env in self.envs:
+                buffers.append(EnvReplayBuffer(
+                    self.replay_buffer_size,
+                    env,
+                ))
+        self.replay_buffers = buffers
 
         self._n_env_steps_total = 0
         self._n_train_steps_total = 0
@@ -106,7 +112,20 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         self._current_path_builder = PathBuilder()
         self._exploration_paths = []
 
+    def sample_task(self, eval=False):
+        '''
+        sample task randomly
+        '''
+        if eval:
+            idx = np.random.randint(len(self.eval_envs))
+        else:
+            idx = np.random.randint(len(self.envs))
+        return idx
+
     def train(self, start_epoch=0):
+        '''
+        meta-training loop
+        '''
         self.pretrain()
         if start_epoch == 0:
             params = self.get_epoch_snapshot(-1)
@@ -115,7 +134,49 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         self._n_env_steps_total = start_epoch * self.num_env_steps_per_epoch
         gt.reset()
         gt.set_def_unique(False)
-        self.train_online(start_epoch=start_epoch)
+        self._current_path_builder = PathBuilder()
+        for epoch in gt.timed_for(
+                range(start_epoch, self.num_epochs),
+                save_itrs=True,
+        ):
+            # train
+            self._start_epoch(epoch)
+            self.training_mode(True)
+            for i in range(self.num_env_steps_per_epoch):
+                self.collect_batch_updates()
+                self.perform_meta_update()
+            self.training_mode(False)
+
+            # eval
+            self._try_to_eval(epoch)
+            gt.stamp('eval')
+
+            self._end_epoch()
+
+    def collect_batch_updates(self):
+        '''
+        for each task in the meta batch
+         - collect data from exploration policy
+         - sample data from replay buffer, compute grads
+         - collect data with current policy
+        '''
+        for _ in range(self.meta_batch):
+            task_idx = self.sample_task()
+            self.env, self.replay_buffer = self.envs[task_idx], self.replay_buffers[task_idx]
+            self.training_env = self.env # TODO can maybe do without this
+            self.exploration_policy.reset_eval_z()
+            self.collect_data(num_samples=self.batch_size)
+            if self._can_train():
+                self._do_training()
+                self._n_train_steps_total += 1
+                gt.stamp('train')
+                self.collect_data(num_samples=self.batch_size)
+
+    def perform_meta_update(self):
+        '''
+        update networks with grads accumulated across meta batch
+        '''
+        pass
 
     def pretrain(self):
         """
@@ -123,57 +184,39 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         """
         pass
 
-    def train_online(self, start_epoch=0):
-        self._current_path_builder = PathBuilder()
+    def collect_data(self, num_samples=1):
+        '''
+        collect data from current env in batch mode
+        with exploration policy
+        '''
         observation = self._start_new_rollout()
-        for epoch in gt.timed_for(
-                range(start_epoch, self.num_epochs),
-                save_itrs=True,
-        ):
-            self._start_epoch(epoch)
-            for _ in range(self.num_env_steps_per_epoch):
-                action, agent_info = self._get_action_and_info(
-                    observation,
-                )
-                if self.render:
-                    self.training_env.render()
-                next_ob, raw_reward, terminal, env_info = (
-                    self.training_env.step(action)
-                )
-                self._n_env_steps_total += 1
-                reward = raw_reward * self.reward_scale
-                terminal = np.array([terminal])
-                reward = np.array([reward])
-                self._handle_step(
-                    observation,
-                    action,
-                    reward,
-                    next_ob,
-                    terminal,
-                    agent_info=agent_info,
-                    env_info=env_info,
-                )
-                if terminal or len(self._current_path_builder) >= self.max_path_length:
-                    self._handle_rollout_ending()
-                    observation = self._start_new_rollout()
-                else:
-                    observation = next_ob
+        for _ in range(num_samples):
+            action, agent_info = self._get_action_and_info(observation)
+            if self.render:
+                self.training_env.render()
+            next_ob, raw_reward, terminal, env_info = (
+                self.training_env.step(action)
+            )
+            self._n_env_steps_total += 1
+            reward = raw_reward * self.reward_scale
+            terminal = np.array([terminal])
+            reward = np.array([reward])
+            self._handle_step(
+                observation,
+                action,
+                reward,
+                next_ob,
+                terminal,
+                agent_info=agent_info,
+                env_info=env_info,
+            )
+            if terminal or len(self._current_path_builder) >= self.max_path_length:
+                self._handle_rollout_ending()
+                observation = self._start_new_rollout()
+            else:
+                observation = next_ob
 
-                gt.stamp('sample')
-                self._try_to_train()
-                gt.stamp('train')
-
-            self._try_to_eval(epoch)
-            gt.stamp('eval')
-            self._end_epoch()
-
-    def _try_to_train(self):
-        if self._can_train():
-            self.training_mode(True)
-            for i in range(self.num_updates_per_train_call):
-                self._do_training()
-                self._n_train_steps_total += 1
-            self.training_mode(False)
+            gt.stamp('sample')
 
     def _try_to_eval(self, epoch):
         logger.save_extra_data(self.get_extra_data_to_save(epoch))
@@ -247,9 +290,7 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
         :return:
         """
         self.exploration_policy.set_num_steps_total(self._n_env_steps_total)
-        return self.exploration_policy.get_action(
-            observation,
-        )
+        return self.exploration_policy.get_action(observation,)
 
     def _start_epoch(self, epoch):
         self._epoch_start_time = time.time()
