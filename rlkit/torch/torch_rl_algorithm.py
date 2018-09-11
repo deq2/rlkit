@@ -6,13 +6,13 @@ import numpy as np
 from torch.autograd import Variable
 
 import rlkit.core.eval_util
-from rlkit.core.rl_algorithm import RLAlgorithm
+from rlkit.core.rl_algorithm import MetaRLAlgorithm
 from rlkit.torch import pytorch_util as ptu
 from rlkit.torch.core import PyTorchModule
 from rlkit.core import logger, eval_util
 
 
-class TorchRLAlgorithm(RLAlgorithm, metaclass=abc.ABCMeta):
+class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
     def __init__(self, *args, render_eval_paths=False, plotter=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_statistics = None
@@ -36,34 +36,44 @@ class TorchRLAlgorithm(RLAlgorithm, metaclass=abc.ABCMeta):
         for net in self.networks:
             net.cuda()
 
+    def obtain_samples(self, env):
+        '''
+        get rollouts of current policy in env
+        '''
+        return self.eval_sampler.obtain_samples()
+
     def evaluate(self, epoch):
         statistics = OrderedDict()
+        # save stuff from training
         statistics.update(self.eval_statistics)
         self.eval_statistics = None
+        print('evaluating on {} evaluation tasks'.format(self.num_eval_tasks))
+        for _ in range(self.num_eval_tasks):
+            # TODO how to handle eval over multiple tasks?
+            idx = self.sample_task(eval=True)
+            self.eval_sampler.set_env(self.envs[idx])
 
-        logger.log("Collecting samples for evaluation")
-        test_paths = self.eval_sampler.obtain_samples()
+            test_paths = self.obtain_samples(self.envs[idx])
 
-        statistics.update(eval_util.get_generic_path_information(
-            test_paths, stat_prefix="Test",
-        ))
-        statistics.update(eval_util.get_generic_path_information(
-            self._exploration_paths, stat_prefix="Exploration",
-        ))
-        if hasattr(self.env, "log_diagnostics"):
-            self.env.log_diagnostics(test_paths)
+            statistics.update(eval_util.get_generic_path_information(
+                test_paths, stat_prefix="Test",
+            ))
+            statistics.update(eval_util.get_generic_path_information(
+                self._exploration_paths, stat_prefix="Exploration",
+            ))
+            if hasattr(self.env, "log_diagnostics"):
+                self.env.log_diagnostics(test_paths)
 
-        average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
-        statistics['AverageReturn'] = average_returns
-        for key, value in statistics.items():
-            logger.record_tabular(key, value)
+            average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
+            statistics['AverageReturn'] = average_returns
+            for key, value in statistics.items():
+                logger.record_tabular(key, value)
 
-        if self.render_eval_paths:
-            self.env.render_paths(test_paths)
+            if self.render_eval_paths:
+                self.env.render_paths(test_paths)
 
-        if self.plotter:
-            self.plotter.draw()
-
+            if self.plotter:
+                self.plotter.draw()
 
 def _elem_or_tuple_to_variable(elem_or_tuple):
     if isinstance(elem_or_tuple, tuple):

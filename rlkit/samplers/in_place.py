@@ -28,6 +28,9 @@ class InPlacePathSampler(object):
     def shutdown_worker(self):
         pass
 
+    def set_env(self, env):
+        self.env = env
+
     def obtain_samples(self):
         paths = []
         n_steps_total = 0
