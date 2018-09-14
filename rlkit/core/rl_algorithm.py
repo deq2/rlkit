@@ -162,6 +162,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         '''
         for _ in range(self.meta_batch):
             task_idx = self.sample_task()
+            self.task_idx = task_idx
             self.env, self.replay_buffer = self.envs[task_idx], self.replay_buffers[task_idx]
             self.training_env = self.env # TODO can maybe do without this
             self.exploration_policy.reset_eval_z()

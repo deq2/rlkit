@@ -76,11 +76,16 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         this is more involved than usual because we have to sample rollouts, compute z, then sample new rollouts conditioned on z
         '''
         # TODO for now set task encoder to zero, should be sampled
-        self.eval_sampler.policy.reset_eval_z()
-        trajs = self.eval_sampler.obtain_samples()
-        rewards = torch_ify(np.concatenate([t['rewards'] for t in trajs]).astype(np.float32))
-        obs = torch_ify(np.concatenate([t['observations'] for t in trajs]).astype(np.float32))
-        z = np_ify(torch.mean(self.task_enc(obs, rewards)))
+        #self.eval_sampler.policy.reset_eval_z()
+        #trajs = self.eval_sampler.obtain_samples()
+        #rewards = torch_ify(np.concatenate([t['rewards'] for t in trajs]).astype(np.float32))
+        #obs = torch_ify(np.concatenate([t['observations'] for t in trajs]).astype(np.float32))
+        #z = np_ify(torch.mean(self.task_enc(obs, rewards)))
+        z = np.zeros(1, dtype=np.float32)
+        if self.task_idx == 1:
+            z += 1
+        else:
+            z -= 1
         self.eval_sampler.policy.set_eval_z(z)
         test_paths = self.eval_sampler.obtain_samples()
         return test_paths
@@ -109,6 +114,10 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         # for the task encoding z
         #z = torch.mean(self.task_enc(obs, rewards))
         z = np.zeros(1, dtype=np.float32)
+        if self.task_idx == 1:
+            z += 1
+        else:
+            z -= 1
         batch_z = torch_ify(z.repeat(obs.shape[0])[..., None])
         #batch_z = z.repeat(obs.shape[0])[..., None]
         q_pred = self.qf(obs, actions, batch_z)

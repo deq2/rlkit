@@ -48,9 +48,13 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
         statistics.update(self.eval_statistics)
         self.eval_statistics = None
         print('evaluating on {} evaluation tasks'.format(self.num_eval_tasks))
+        task_returns = 0
         for _ in range(self.num_eval_tasks):
             # TODO how to handle eval over multiple tasks?
+            # right now just keeping track of avg return across tasks but nothing else
             idx = self.sample_task(eval=True)
+            print('eval task', idx)
+            self.task_idx = idx
             self.eval_sampler.set_env(self.envs[idx])
 
             test_paths = self.obtain_samples(self.envs[idx])
@@ -65,15 +69,16 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
                 self.env.log_diagnostics(test_paths)
 
             average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
-            statistics['AverageReturn'] = average_returns
-            for key, value in statistics.items():
-                logger.record_tabular(key, value)
+            task_returns += average_returns
+        statistics['AverageReturn'] = average_returns
+        for key, value in statistics.items():
+            logger.record_tabular(key, value)
 
-            if self.render_eval_paths:
-                self.env.render_paths(test_paths)
+        if self.render_eval_paths:
+            self.env.render_paths(test_paths)
 
-            if self.plotter:
-                self.plotter.draw()
+        if self.plotter:
+            self.plotter.draw()
 
 def _elem_or_tuple_to_variable(elem_or_tuple):
     if isinstance(elem_or_tuple, tuple):

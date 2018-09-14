@@ -15,7 +15,7 @@ from rlkit.torch.sac.proto_sac import ProtoSoftActorCritic
 
 def experiment(variant):
     directions = [{'direction': -1}, {'direction': 1}]
-    envs = [NormalizedBoxEnv(HalfCheetahDirEnv(d)) for d in directions[:1]]
+    envs = [NormalizedBoxEnv(HalfCheetahDirEnv(d)) for d in directions]
 
     obs_dim = int(np.prod(envs[0].observation_space.shape))
     action_dim = int(np.prod(envs[0].action_space.shape))
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
             num_epochs=1000, # meta-train epochs
             num_steps_per_epoch=1000, # num updates per epoch
-            num_eval_tasks=1, # num tasks to sample for eval
+            num_eval_tasks=10, # num tasks to sample for eval
             num_steps_per_eval=1000, # num obs to eval on
             batch_size=128, # to compute training grads from
             max_path_length=999,
@@ -77,5 +77,5 @@ if __name__ == "__main__":
         ),
         net_size=300,
     )
-    setup_logger('proto-sac-cheetah-forward', variant=variant)
+    setup_logger('proto-sac-cheetah-fb-indicator', variant=variant)
     experiment(variant)
