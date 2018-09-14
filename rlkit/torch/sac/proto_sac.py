@@ -7,7 +7,7 @@ from torch import nn as nn
 from torch.autograd import Variable
 
 import rlkit.torch.pytorch_util as ptu
-from rlkit.torch.core import np_ify
+from rlkit.torch.core import np_ify, torch_ify
 from rlkit.core.eval_util import create_stats_ordered_dict
 from rlkit.torch.torch_rl_algorithm import MetaTorchRLAlgorithm
 from rlkit.torch.sac.policies import MakeDeterministic
@@ -78,8 +78,8 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         # TODO for now set task encoder to zero, should be sampled
         self.eval_sampler.policy.reset_eval_z()
         trajs = self.eval_sampler.obtain_samples()
-        rewards = Variable(torch.from_numpy(np.concatenate([t['rewards'] for t in trajs]).astype(np.float32)))
-        obs = Variable(torch.from_numpy(np.concatenate([t['observations'] for t in trajs]).astype(np.float32)))
+        rewards = torch_ify(np.concatenate([t['rewards'] for t in trajs]).astype(np.float32))
+        obs = torch_ify(np.concatenate([t['observations'] for t in trajs]).astype(np.float32))
         z = np_ify(torch.mean(self.task_enc(obs, rewards)))
         self.eval_sampler.policy.set_eval_z(z)
         test_paths = self.eval_sampler.obtain_samples()
@@ -107,8 +107,10 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
 
         # NOTE: right now policy is updated on the same rollouts used
         # for the task encoding z
-        z = torch.mean(self.task_enc(obs, rewards))
-        batch_z = z.repeat(obs.shape[0])[..., None]
+        #z = torch.mean(self.task_enc(obs, rewards))
+        z = np.zeros(1, dtype=np.float32)
+        batch_z = torch_ify(z.repeat(obs.shape[0])[..., None])
+        #batch_z = z.repeat(obs.shape[0])[..., None]
         q_pred = self.qf(obs, actions, batch_z)
         v_pred = self.vf(obs, batch_z)
         # make sure policy accounts for squashing functions like tanh correctly!
