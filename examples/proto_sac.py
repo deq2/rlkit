@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
             num_epochs=1000, # meta-train epochs
             num_steps_per_epoch=1000, # num updates per epoch
-            num_eval_tasks=10, # num tasks to sample for eval
+            num_eval_tasks=2, # num tasks to sample for eval
             num_steps_per_eval=1000, # num obs to eval on
             batch_size=128, # to compute training grads from
             max_path_length=999,

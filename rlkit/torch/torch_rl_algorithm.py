@@ -48,29 +48,23 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
         statistics.update(self.eval_statistics)
         self.eval_statistics = None
         print('evaluating on {} evaluation tasks'.format(self.num_eval_tasks))
-        task_returns = 0
-        for _ in range(self.num_eval_tasks):
+        for idx in range(self.num_eval_tasks):
             # TODO how to handle eval over multiple tasks?
-            # right now just keeping track of avg return across tasks but nothing else
-            idx = self.sample_task(eval=True)
-            print('eval task', idx)
-            self.task_idx = idx
             self.eval_sampler.set_env(self.envs[idx])
 
             test_paths = self.obtain_samples(self.envs[idx])
 
             statistics.update(eval_util.get_generic_path_information(
-                test_paths, stat_prefix="Test",
+                test_paths, stat_prefix="Test_task{}".format(idx),
             ))
             statistics.update(eval_util.get_generic_path_information(
-                self._exploration_paths, stat_prefix="Exploration",
+                self._exploration_paths, stat_prefix="Exploration_task{}".format(idx),
             ))
             if hasattr(self.env, "log_diagnostics"):
                 self.env.log_diagnostics(test_paths)
 
             average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
-            task_returns += average_returns
-        statistics['AverageReturn'] = average_returns
+            statistics['AverageReturn_task{}'.format(idx)] = average_returns
         for key, value in statistics.items():
             logger.record_tabular(key, value)
 
