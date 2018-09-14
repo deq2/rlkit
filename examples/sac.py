@@ -5,6 +5,7 @@ NOTE: You need PyTorch 0.3 or more (to have torch.distributions)
 """
 import numpy as np
 from gym.envs.mujoco import HalfCheetahEnv
+from rlkit.envs.half_cheetah_dir import HalfCheetahDirEnv
 
 import rlkit.torch.pytorch_util as ptu
 from rlkit.envs.wrappers import NormalizedBoxEnv
@@ -15,7 +16,7 @@ from rlkit.torch.networks import FlattenMlp
 
 
 def experiment(variant):
-    env = NormalizedBoxEnv(HalfCheetahEnv())
+    env = NormalizedBoxEnv(HalfCheetahDirEnv())
     # Or for a specific version:
     # import gym
     # env = NormalizedBoxEnv(gym.make('HalfCheetah-v1'))
@@ -69,5 +70,5 @@ if __name__ == "__main__":
         ),
         net_size=300,
     )
-    setup_logger('name-of-experiment', variant=variant)
+    setup_logger('sac-half-cheetah-forward', variant=variant)
     experiment(variant)
