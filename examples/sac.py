@@ -14,7 +14,7 @@ from rlkit.torch.sac.sac import ProtoSoftActorCritic
 
 
 def experiment(variant):
-    directions = [{'direction': 0}, {'direction': 1}]
+    directions = [{'direction': -1}, {'direction': 1}]
     envs = [NormalizedBoxEnv(HalfCheetahDirEnv(d)) for d in directions]
 
     obs_dim = int(np.prod(envs[0].observation_space.shape))
