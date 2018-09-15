@@ -24,6 +24,10 @@ class HalfCheetahDirEnv(HalfCheetahEnv):
         self._goal_dir = task.get('direction', 1)
         super(HalfCheetahDirEnv, self).__init__()
 
+    def _get_obs(self):
+        obs = super()._get_obs()
+        return np.concatenate([obs, np.array([self._goal_dir], dtype=np.float32)])
+
     def step(self, action):
         xposbefore = self.sim.data.qpos[0]
         self.do_simulation(action, self.frame_skip)
@@ -48,3 +52,4 @@ class HalfCheetahDirEnv(HalfCheetahEnv):
     def reset_task(self, task):
         self._task = task
         self._goal_dir = task['direction']
+

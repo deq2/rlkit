@@ -41,20 +41,22 @@ class TorchRLAlgorithm(RLAlgorithm, metaclass=abc.ABCMeta):
         statistics.update(self.eval_statistics)
         self.eval_statistics = None
 
-        logger.log("Collecting samples for evaluation")
-        test_paths = self.eval_sampler.obtain_samples()
+        logger.log("Collecting samples from BOTH tasks for evaluation")
+        for goal in [-1, 1]:
+            self.eval_sampler.env.reset_task({'direction': goal})
+            test_paths = self.eval_sampler.obtain_samples()
 
-        statistics.update(eval_util.get_generic_path_information(
-            test_paths, stat_prefix="Test",
-        ))
-        statistics.update(eval_util.get_generic_path_information(
-            self._exploration_paths, stat_prefix="Exploration",
-        ))
-        if hasattr(self.env, "log_diagnostics"):
-            self.env.log_diagnostics(test_paths)
+            statistics.update(eval_util.get_generic_path_information(
+                test_paths, stat_prefix="Test_{}".format(goal),
+            ))
+            statistics.update(eval_util.get_generic_path_information(
+                self._exploration_paths, stat_prefix="Exploration_{}".format(goal),
+            ))
+            if hasattr(self.env, "log_diagnostics"):
+                self.env.log_diagnostics(test_paths)
 
-        average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
-        statistics['AverageReturn'] = average_returns
+            average_returns = rlkit.core.eval_util.get_average_returns(test_paths)
+            statistics['AverageReturn_{}'.format(goal)] = average_returns
         for key, value in statistics.items():
             logger.record_tabular(key, value)
 

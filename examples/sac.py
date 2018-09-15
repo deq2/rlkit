@@ -70,5 +70,5 @@ if __name__ == "__main__":
         ),
         net_size=300,
     )
-    setup_logger('sac-half-cheetah-forward', variant=variant)
+    setup_logger('sac-half-cheetah-fb', variant=variant)
     experiment(variant)

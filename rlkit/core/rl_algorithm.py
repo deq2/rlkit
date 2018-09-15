@@ -266,6 +266,8 @@ class RLAlgorithm(metaclass=abc.ABCMeta):
 
     def _start_new_rollout(self):
         self.exploration_policy.reset()
+        goal = np.random.choice([-1, 1])
+        self.training_env.reset_task({'direction': goal})
         return self.training_env.reset()
 
     def _handle_path(self, path):
