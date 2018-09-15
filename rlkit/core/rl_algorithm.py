@@ -15,9 +15,10 @@ from rlkit.samplers.in_place import InPlacePathSampler
 class MetaRLAlgorithm(metaclass=abc.ABCMeta):
     def __init__(
             self,
-            envs,
+            env,
+            tasks,
             exploration_policy: ExplorationPolicy,
-            eval_envs=None,
+            eval_tasks,
             meta_batch=64,
             num_epochs=100,
             num_steps_per_epoch=10000,
@@ -39,8 +40,9 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
     ):
         """
         Base class for Meta RL Algorithms
-        :param envs: list of environments used for training, by default same envs used for eval
-        :param eval_envs: optional list of environments used for evaluation
+        :param env: training env
+        :param train_tasks: list of tasks used for training
+        :param eval_tasks: list of tasks used for eval
         :param exploration_policy: policy used to explore
         :param meta_batch: number of tasks used for meta-update
         :param num_epochs: number of meta-training epochs
@@ -61,10 +63,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         :param eval_policy: policy to evaluate with, if None then defaults to exploration policy
         :param replay_buffers: one for each task
         """
-        self.envs = envs
+        self.env = env
+        self.train_tasks = train_tasks
+        self.eval_tasks = eval_tasks
         self.exploration_policy = exploration_policy
-        if eval_envs is None:
-            self.eval_envs = envs
         self.meta_batch = meta_batch
         self.num_epochs = num_epochs
         self.num_env_steps_per_epoch = num_steps_per_epoch
@@ -95,7 +97,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
 
         if replay_buffers is None:
             buffers = []
-            for env in self.envs:
+            for task in self.train_tasks:
                 buffers.append(EnvReplayBuffer(
                     self.replay_buffer_size,
                     env,
@@ -130,7 +132,6 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         if start_epoch == 0:
             params = self.get_epoch_snapshot(-1)
             logger.save_itr_params(-1, params)
-        self.training_mode(False)
         self._n_env_steps_total = start_epoch * self.num_env_steps_per_epoch
         gt.reset()
         gt.set_def_unique(False)
@@ -161,8 +162,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
          - collect data with current policy
         '''
         for _ in range(self.meta_batch):
+            # sample a task and set env accordingly
             task_idx = self.sample_task()
-            self.env, self.replay_buffer = self.envs[task_idx], self.replay_buffers[task_idx]
+            self.task_idx = task_idx
+            self.env.reset_task(self.tasks[task_idx])
+            self.replay_buffer = self.replay_buffers[task_idx]
             self.training_env = self.env # TODO can maybe do without this
             self.exploration_policy.reset_eval_z()
             self.collect_data(num_samples=self.batch_size)
