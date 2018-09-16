@@ -10,14 +10,15 @@ import rlkit.torch.pytorch_util as ptu
 from rlkit.torch.core import np_ify
 from rlkit.core.eval_util import create_stats_ordered_dict
 from rlkit.torch.torch_rl_algorithm import MetaTorchRLAlgorithm
-from rlkit.torch.sac.policies import MakeDeterministic
+from rlkit.torch.sac.policies import MakeDeterministic, ProtoExplorationPolicy
 
 
 class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
     def __init__(
             self,
-            envs,
-            eval_envs,
+            env,
+            train_tasks,
+            eval_tasks,
             nets,
 
             policy_lr=1e-3,
@@ -35,15 +36,11 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
             **kwargs
     ):
         self.task_enc, self.policy, self.qf, self.vf = nets
-        if eval_deterministic:
-            eval_policy = MakeDeterministic(self.policy)
-        else:
-            eval_policy = self.policy
-        # call super init
         super().__init__(
-            envs=envs,
-            exploration_policy=self.policy,
-            eval_policy=eval_policy,
+            env=env,
+            policy=self.policy,
+            train_tasks=train_tasks,
+            eval_tasks=eval_tasks,
             **kwargs
         )
         self.soft_target_tau = soft_target_tau
@@ -71,21 +68,31 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
             lr=vf_lr,
         )
 
-    def obtain_samples(self, env):
+    def make_exploration_policy(self, policy):
+        return ProtoExplorationPolicy(policy)
+
+    def make_eval_policy(self, policy, deterministic=True):
+        if deterministic:
+            eval_policy = MakeDeterministic(policy)
+        else:
+            eval_policy = self.policy
+        return eval_policy
+
+    def obtain_samples(self):
         '''
         this is more involved than usual because we have to sample rollouts, compute z, then sample new rollouts conditioned on z
         '''
         # TODO for now set task encoder to zero, should be sampled
-        self.eval_sampler.policy.reset_eval_z()
-        trajs = self.eval_sampler.obtain_samples()
+        trajs = self.eval_sampler.obtain_samples(explore=True)
         rewards = Variable(torch.from_numpy(np.concatenate([t['rewards'] for t in trajs]).astype(np.float32)))
         obs = Variable(torch.from_numpy(np.concatenate([t['observations'] for t in trajs]).astype(np.float32)))
         z = np_ify(torch.mean(self.task_enc(obs, rewards)))
         self.eval_sampler.policy.set_eval_z(z)
-        test_paths = self.eval_sampler.obtain_samples()
+        test_paths = self.eval_sampler.obtain_samples(explore=False)
         return test_paths
 
     def perform_meta_update(self):
+        # assume gradients have been accumulated for each parameter, apply update
         self.qf_optimizer.step()
         self.vf_optimizer.step()
         self.policy_optimizer.step()
@@ -175,7 +182,7 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
             ))
 
         # update policy's task encoding for data collection
-        self.exploration_policy.set_eval_z(np_ify(z))
+        self.policy.set_eval_z(np_ify(z))
 
 
     @property

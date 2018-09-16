@@ -14,11 +14,11 @@ from rlkit.torch.sac.sac import ProtoSoftActorCritic
 
 
 def experiment(variant):
-    directions = [{'direction': -1}, {'direction': 1}]
-    envs = [NormalizedBoxEnv(HalfCheetahDirEnv(d)) for d in directions]
+    env = NormalizedBoxEnv(HalfCheetahDirEnv())
+    tasks = env.get_all_task_idx()
 
-    obs_dim = int(np.prod(envs[0].observation_space.shape))
-    action_dim = int(np.prod(envs[0].action_space.shape))
+    obs_dim = int(np.prod(env.observation_space.shape))
+    action_dim = int(np.prod(env.action_space.shape))
     latent_dim = 1
     reward_dim = 1
 
@@ -46,8 +46,9 @@ def experiment(variant):
         action_dim=action_dim,
     )
     algorithm = ProtoSoftActorCritic(
-        envs=envs,
-        eval_envs=None,
+        env=env,
+        train_tasks=tasks,
+        eval_tasks=tasks,
         nets=[task_enc, policy, qf, vf],
         meta_batch=variant['mbatch_size'],
         **variant['algo_params']
@@ -59,12 +60,11 @@ if __name__ == "__main__":
     # noinspection PyTypeChecker
     variant = dict(
         meta_epochs=10,
-        mbatch_size=1,
+        mbatch_size=32,
         algo_params=dict(
 
             num_epochs=1000, # meta-train epochs
             num_steps_per_epoch=1000, # num updates per epoch
-            num_eval_tasks=2, # num tasks to sample for eval
             num_steps_per_eval=1000, # num obs to eval on
             batch_size=128, # to compute training grads from
             max_path_length=999,

@@ -20,7 +20,7 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
         self.plotter = plotter
 
     def get_batch(self):
-        batch = self.replay_buffer.random_batch(self.batch_size)
+        batch = self.replay_buffer.random_batch(self.task_idx, self.batch_size)
         return np_to_pytorch_batch(batch)
 
     @property
@@ -47,12 +47,12 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
         # save stuff from training
         statistics.update(self.eval_statistics)
         self.eval_statistics = None
-        print('evaluating on {} evaluation tasks'.format(self.num_eval_tasks))
-        for idx in range(self.num_eval_tasks):
+        print('evaluating on {} evaluation tasks'.format(len(self.eval_tasks)))
+        for idx in range(len(self.eval_tasks)):
             # TODO how to handle eval over multiple tasks?
-            self.eval_sampler.set_env(self.envs[idx])
+            self.eval_sampler.env.reset_task(idx)
 
-            test_paths = self.obtain_samples(self.envs[idx])
+            test_paths = self.obtain_samples()
 
             statistics.update(eval_util.get_generic_path_information(
                 test_paths, stat_prefix="Test_task{}".format(idx),
