@@ -53,7 +53,7 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
             # TODO how to handle eval over multiple tasks?
             self.eval_sampler.env.reset_task(idx)
 
-            test_paths = self.obtain_samples()
+            test_paths = self.obtain_samples(idx)
             # TODO incorporate into proper logging
             # save evaluation rollouts for vis
             with open("/mounts/output/proto-sac-point-mass-fb-task{}-{}.pkl".format(idx, epoch), 'wb') as f:
