@@ -1,6 +1,14 @@
 import numpy as np
 from gym.envs.mujoco import HalfCheetahEnv as HalfCheetahEnv_
 
+'''
+adapted from https://github.com/tristandeleu/pytorch-maml-rl
+different from default gym cheetah env:
+ - augmented observation (WHY?)
+ - custom viewer
+ - custom render (looks like for compatibility with old mujoco??)
+'''
+
 class HalfCheetahEnv(HalfCheetahEnv_):
     def _get_obs(self):
         return np.concatenate([
