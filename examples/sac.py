@@ -5,6 +5,7 @@ NOTE: You need PyTorch 0.3 or more (to have torch.distributions)
 """
 import numpy as np
 from gym.envs.mujoco import HalfCheetahEnv
+import click
 from rlkit.envs.half_cheetah_dir import HalfCheetahDirEnv
 from rlkit.envs.point_mass import PointEnv
 
@@ -54,7 +55,10 @@ def experiment(variant):
     algorithm.train()
 
 
-if __name__ == "__main__":
+@click.command()
+@click.argument('docker', default=0)
+def main(docker):
+    log_dir = '/mounts/output' if docker == 1 else 'output'
     # noinspection PyTypeChecker
     variant = dict(
         algo_params=dict(
@@ -62,7 +66,7 @@ if __name__ == "__main__":
             num_steps_per_epoch=1000,
             num_steps_per_eval=1000,
             batch_size=128,
-            max_path_length=999,
+            max_path_length=100,
             discount=0.99,
 
             soft_target_tau=0.001,
@@ -72,5 +76,8 @@ if __name__ == "__main__":
         ),
         net_size=300,
     )
-    setup_logger('sac-point-mass-fb', variant=variant)
+    setup_logger('sac-point-mass-fb', variant=variant, base_log_dir=log_dir)
     experiment(variant)
+
+if __name__ == "__main__":
+    main()
