@@ -10,17 +10,26 @@ class PointEnv(Env):
     """
 
     def __init__(self, task={'direction': 1}):
-        self.reset_task(task)
+        directions = [-1, 1]
+        self.tasks = [{'direction': direction} for direction in directions]
+        self._task = task
+        self._goal = self.reset_goal(task.get('direction', 1))
         self.reset_model()
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3,))
         self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,))
 
-    def reset_task(self, task):
-        self._task = task
-        if task['direction'] == 1:
-            self._goal = np.array([1, 1])
+    def reset_task(self, idx):
+        self._task = self.tasks[idx]
+        self._goal = self.reset_goal(self._task['direction'])
+
+    def reset_goal(self, direction):
+        if direction == 1:
+            return np.array([1, 1])
         else:
-            self._goal = np.array([-1, -1])
+            return np.array([-1, -1])
+
+    def get_all_task_idx(self):
+        return range(len(self.tasks))
 
     def reset_model(self):
         state = np.random.uniform(-1, 1, size=(2,))
