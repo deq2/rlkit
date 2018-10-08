@@ -13,7 +13,7 @@ class PointEnv(Env):
         self.reset_task(task)
         self.reset_model()
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(3,))
-        self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,))
+        self.action_space = spaces.Box(low=-2, high=2, shape=(2,))
 
     def reset_task(self, task):
         self._task = task
