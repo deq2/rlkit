@@ -1,6 +1,7 @@
 import abc
 from collections import OrderedDict
 from typing import Iterable
+import pickle
 
 import numpy as np
 from torch.autograd import Variable
@@ -45,6 +46,10 @@ class TorchRLAlgorithm(RLAlgorithm, metaclass=abc.ABCMeta):
         for goal in [-1, 1]:
             self.eval_sampler.env.reset_task({'direction': goal})
             test_paths = self.eval_sampler.obtain_samples()
+            # TODO incorporate into proper logging
+            # save evaluation rollouts for vis
+            with open("/mounts/output/sac-point-mass-fb-goal{}-{}.pkl".format(goal, epoch), 'wb') as f:
+                pickle.dump(test_paths, f, pickle.HIGHEST_PROTOCOL)
 
             statistics.update(eval_util.get_generic_path_information(
                 test_paths, stat_prefix="Test_{}".format(goal),
