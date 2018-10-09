@@ -73,7 +73,7 @@ def main(docker):
             num_steps_per_epoch=1000, # num updates per epoch
             num_steps_per_eval=1000, # num obs to eval on
             batch_size=128, # to compute training grads from
-            max_path_length=999,
+            max_path_length=100,
             discount=0.99,
             soft_target_tau=0.001,
             policy_lr=3E-4,
