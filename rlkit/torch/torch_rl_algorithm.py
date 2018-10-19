@@ -53,12 +53,16 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
             self.task_idx = idx
             print('Task:', idx)
             # TODO how to handle eval over multiple tasks?
+            print('resetting task to idx')
+            print(idx)
             self.eval_sampler.env.reset_task(idx)
 
+            print('idx in torch_rl_algorithm')
+            print(idx)
             test_paths = self.obtain_samples(idx, epoch)
             # TODO incorporate into proper logging
             # save evaluation rollouts for vis
-            with open("/mounts/output/proto-sac-point-mass-fb-16z-task{}-{}.pkl".format(idx, epoch), 'wb') as f:
+            with open("/mounts/output/proto-sac-point-mass-fb-id-task{}-{}.pkl".format(idx, epoch), 'wb') as f:
                 pickle.dump(test_paths, f, pickle.HIGHEST_PROTOCOL)
 
             statistics.update(eval_util.get_generic_path_information(

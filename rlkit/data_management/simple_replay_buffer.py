@@ -19,18 +19,20 @@ class SimpleReplayBuffer(ReplayBuffer):
         # Make everything a 2D np array to make it easier for other code to
         # reason about the shape of the data
         self._rewards = np.zeros((max_replay_buffer_size, 1))
+        self._goals = np.zeros((max_replay_buffer_size, 1))
         # self._terminals[i] = a terminal was received at time i
         self._terminals = np.zeros((max_replay_buffer_size, 1), dtype='uint8')
         self._top = 0
         self._size = 0
 
     def add_sample(self, observation, action, reward, terminal,
-                   next_observation, **kwargs):
+                   next_observation, goal, **kwargs):
         self._observations[self._top] = observation
         self._actions[self._top] = action
         self._rewards[self._top] = reward
         self._terminals[self._top] = terminal
         self._next_obs[self._top] = next_observation
+        self._goals[self._top] = goal
         self._advance()
 
     def terminate_episode(self):
@@ -49,6 +51,7 @@ class SimpleReplayBuffer(ReplayBuffer):
             rewards=self._rewards[indices],
             terminals=self._terminals[indices],
             next_observations=self._next_obs[indices],
+            goals=self._goals[indices],
         )
 
     def num_steps_can_sample(self):

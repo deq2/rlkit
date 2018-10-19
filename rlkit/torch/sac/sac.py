@@ -14,6 +14,8 @@ from rlkit.torch.torch_rl_algorithm import MetaTorchRLAlgorithm
 from rlkit.torch.sac.policies import MakeDeterministic, ProtoExplorationPolicy
 
 
+GOAL_VEC = [-1, 1]
+
 class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
     def __init__(
             self,
@@ -26,6 +28,7 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
             policy_lr=1e-3,
             qf_lr=1e-3,
             vf_lr=1e-3,
+            context_lr=1e-3,
             policy_mean_reg_weight=1e-3,
             policy_std_reg_weight=1e-3,
             policy_pre_activation_weight=0.,
@@ -74,6 +77,10 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         self.vf_optimizer = optimizer_class(
             self.vf.parameters(),
             lr=vf_lr,
+        )
+        self.context_optimizer = optimizer_class(
+            self.task_enc.parameters(),
+            lr=context_lr,
         )
 
     def make_dataset(self, batch, idx):
@@ -140,11 +147,14 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         batch = self.get_batch()
         rewards = batch['rewards']
         obs = batch['observations']
+        goals = batch['goals']
+        # goals = goal.
         # Evaluate task classifier on sampled tuples
         # Task encoding is classification prob of a single tuple
-        z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale), dim=0))
+        z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale, goals)))
         print('task encoding', z)
         self.eval_sampler.policy.set_eval_z(z)
+
         test_paths = self.eval_sampler.obtain_samples(explore=False)
         return test_paths
 
@@ -153,11 +163,13 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         self.qf_optimizer.step()
         self.vf_optimizer.step()
         self.policy_optimizer.step()
+        self.context_optimizer.step()
         self._update_target_network()
 
         self.qf_optimizer.zero_grad()
         self.vf_optimizer.zero_grad()
         self.policy_optimizer.zero_grad()
+        self.context_optimizer.zero_grad()
 
     def _do_training(self):
 
@@ -168,15 +180,18 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         obs = batch['observations']
         actions = batch['actions']
         next_obs = batch['next_observations']
+        goals = batch['goals']
+        # print('goals')
+        # print(goals)
 
         # NOTE: right now policy is updated on the same rollouts used
         # for the task encoding z
-        z = torch.mean(self.task_enc(obs, rewards / self.reward_scale), dim=0)
-        batch_z = z.repeat(obs.shape[0], 1)
-        q_pred = self.qf(obs, actions, batch_z)
+        z = torch.mean(self.task_enc(obs, rewards / self.reward_scale, goals))
+        batch_z = z.repeat(obs.shape[0])[..., None]
+        q_pred = self.qf(obs, actions, batch_z.detach())
         v_pred = self.vf(obs, batch_z)
         # make sure policy accounts for squashing functions like tanh correctly!
-        in_ = torch.cat([obs, batch_z], dim=1)
+        in_ = torch.cat([obs, batch_z.detach()], dim=1)
         policy_outputs = self.policy(in_, return_log_prob=True)
         new_actions, policy_mean, policy_log_std, log_pi = policy_outputs[:4]
 

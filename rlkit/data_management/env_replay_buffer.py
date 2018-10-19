@@ -32,9 +32,10 @@ class MultiTaskReplayBuffer(object):
 
         if isinstance(self._action_space, Discrete):
             action = np.eye(self._action_space.n)[action]
+        goal = [-1, 1][task]
         self.task_buffers[task].add_sample(
                 observation, action, reward, terminal,
-                next_observation, **kwargs)
+                next_observation, goal, **kwargs)
 
     def terminate_episode(self, task):
         self.task_buffers[task].terminate_episode()

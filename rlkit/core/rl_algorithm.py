@@ -143,7 +143,6 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             # train
             self._start_epoch(epoch)
             self.training_mode(True)
-            print('training task classifier')
             if epoch == 0:
                 print('initializing replay buffer')
                 for idx in self.train_tasks:
@@ -158,6 +157,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                         aug_obs = np.concatenate([obs, rewards], axis=1)
 
                         pickle.dump(aug_obs, f, pickle.HIGHEST_PROTOCOL)
+            # if epoch == 0:
+                # print('training task classifier')
+            #     self.train_task_classifier()
+            # else:
+            #     self.train_task_classifier(train_flag=False)
 
             for i in range(self.num_env_steps_per_epoch):
                 self.collect_batch_updates()

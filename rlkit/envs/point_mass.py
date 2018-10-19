@@ -19,6 +19,8 @@ class PointEnv(Env):
         self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,))
 
     def reset_task(self, idx):
+        # print('resetting in env')
+        # print(self.tasks[idx])
         self._task = self.tasks[idx]
         self._goal = self.reset_goal(self._task['direction'])
 
@@ -32,14 +34,19 @@ class PointEnv(Env):
         return range(len(self.tasks))
 
     def reset_model(self):
-        self._state = np.random.uniform(-1, 1, size=(2,))
+        self._state = np.array([.5, .5])
+        # self._state = np.random.uniform(-1, 1, size=(2,))
         return self._get_obs()
 
     def reset(self):
         return self.reset_model()
 
     def _get_obs(self):
+        # print("Task!")
+        # print(self._task['direction'])
+        # print(np.append(np.copy(self._state), self._task['direction']))
         return np.copy(self._state)
+
 
     def step(self, action):
         self._state = self._state + action
