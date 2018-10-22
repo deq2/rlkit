@@ -151,11 +151,7 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         # goals = goal.
         # Evaluate task classifier on sampled tuples
         # Task encoding is classification prob of a single tuple
-<<<<<<< HEAD
-        z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale, goals)))
-=======
         z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale)))
->>>>>>> parent of bdadf3d... make task encoding multi-dimensional
         print('task encoding', z)
         self.eval_sampler.policy.set_eval_z(z)
 
