@@ -31,7 +31,7 @@ def experiment(variant):
     # start with linear task encoding
     task_enc = FlattenMlp(
             hidden_sizes=[4],
-            input_size=obs_dim + reward_dim + goal_dim,
+            input_size=obs_dim + reward_dim,
             output_size=latent_dim,
     )
     qf = FlattenMlp(
@@ -81,7 +81,7 @@ def main(docker):
         ),
         net_size=300,
     )
-    setup_logger('proto-sac-point-mass-fb-taskid', variant=variant, base_log_dir=log_dir)
+    setup_logger('proto-sac-point-mass-fb', variant=variant, base_log_dir=log_dir)
     experiment(variant)
 
 if __name__ == "__main__":

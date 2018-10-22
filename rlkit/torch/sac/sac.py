@@ -151,7 +151,11 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
         # goals = goal.
         # Evaluate task classifier on sampled tuples
         # Task encoding is classification prob of a single tuple
+<<<<<<< HEAD
         z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale, goals)))
+=======
+        z = np_ify(torch.mean(self.task_enc(obs, rewards / self.reward_scale)))
+>>>>>>> parent of bdadf3d... make task encoding multi-dimensional
         print('task encoding', z)
         self.eval_sampler.policy.set_eval_z(z)
 
@@ -186,9 +190,9 @@ class ProtoSoftActorCritic(MetaTorchRLAlgorithm):
 
         # NOTE: right now policy is updated on the same rollouts used
         # for the task encoding z
-        z = torch.mean(self.task_enc(obs, rewards / self.reward_scale, goals))
+        z = torch.mean(self.task_enc(obs, rewards / self.reward_scale))
         batch_z = z.repeat(obs.shape[0])[..., None]
-        q_pred = self.qf(obs, actions, batch_z.detach())
+        q_pred = self.qf(obs, actions, batch_z)
         v_pred = self.vf(obs, batch_z)
         # make sure policy accounts for squashing functions like tanh correctly!
         in_ = torch.cat([obs, batch_z.detach()], dim=1)
