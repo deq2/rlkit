@@ -157,11 +157,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                         aug_obs = np.concatenate([obs, rewards], axis=1)
 
                         pickle.dump(aug_obs, f, pickle.HIGHEST_PROTOCOL)
-            # if epoch == 0:
-                # print('training task classifier')
-            #     self.train_task_classifier()
-            # else:
-            #     self.train_task_classifier(train_flag=False)
+            if epoch == 0:
+                print('training task classifier')
+                self.train_task_classifier()
+            else:
+                self.train_task_classifier(train_flag=False)
 
             for i in range(self.num_env_steps_per_epoch):
                 self.collect_batch_updates()
