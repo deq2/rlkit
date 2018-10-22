@@ -51,14 +51,8 @@ class MetaTorchRLAlgorithm(MetaRLAlgorithm, metaclass=abc.ABCMeta):
         print('evaluating on {} evaluation tasks'.format(len(self.eval_tasks)))
         for idx in range(len(self.eval_tasks)):
             self.task_idx = idx
-            print('Task:', idx)
             # TODO how to handle eval over multiple tasks?
-            print('resetting task to idx')
-            print(idx)
             self.eval_sampler.env.reset_task(idx)
-
-            print('idx in torch_rl_algorithm')
-            print(idx)
             test_paths = self.obtain_samples(idx, epoch)
             # TODO incorporate into proper logging
             # save evaluation rollouts for vis
